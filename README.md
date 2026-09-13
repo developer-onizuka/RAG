@@ -6,7 +6,7 @@
 
 # 1. LLMの進化段階とアーキテクチャの階層
 
-LLMは単体では「密室の対話エンジン」に過ぎず、外部システムやナレッジデータベースと連携する**Tools（外部機能）**を付与することで初めて実務利用可能な**AIエージェント**へと進化します。
+LLMは単体では**密室の対話エンジン**に過ぎず、外部システムやナレッジデータベースと連携する**Tools（外部機能）**を付与することで初めて実務利用可能な**AIエージェント**へと進化します。
 
 ```text
 1. Base Model（事前学習モデル：次単語予測のみ）
@@ -28,6 +28,51 @@ LLMは単体では「密室の対話エンジン」に過ぎず、外部シス�
 * **単体LLM（Instruct Model）の限界:** 学習時点以降の最新情報や社内の非公開データを保持しておらず、未知のドメインに対してハルシネーション（嘘）を出力してしまう。
 * **AI Agentへの進化:** 単体LLMを推論エンジン（脳）として位置づけ、外部知識を参照する**RAG**をはじめとするToolsを周囲に配置することで、信頼性の高い回答を生成可能にする。
 
+
+### 1-1. AI Agent Architecture & Implementation Scope
+
+AIエージェントシステムにおいて、LLMはテキスト推論エンジンであり、単体では外部システムへの直接アクセス能力を持ちません。エージェントの実装とは、**LLMを取り巻くアプリケーション層（MCP Client / Agent Orchestrator）を構築し、LLMにツールの存在を認識させて協調動作させること**を指します。
+
+今日のFDE（Forward Deployed Engineer）やAIエンジニアの実務において、LLMのファインチューニングを行う機会は限られており、主要な開発領域は**このオーケストレーション層（MCP Clientの実装、ツール定義のバインディング、コンテキスト制御、状態管理）の設計・実装**に移っています。
+
+---
+
+### System Architecture Diagram
+
+```text
++-------------------------------------------------------------+
+|               User / Application Interface                  |
++-------------------------------------------------------------+
+                              │
+                              │ (User Request)
+                              ▼
++-------------------------------------------------------------+
+|   Application Layer / MCP Client (FDE & AI Engineer Scope)  |
+|   - Tool Binding & Schema Management (MCP Protocol)         |
+|   - Context & Conversation State Tracking                   |
+|   - Orchestration Loop & Dynamic Routing                    |
+|   - Tool Execution & Result Feedback Handling               |
++-------------------------------------------------------------+
+            │                                     │
+ (1) System Prompt + Tool Schemas         (3) Execute Tool Call
+     & User Query                             & Fetch Data
+            │                                     │
+            ▼                                     ▼
++-----------------------+             +-----------------------+
+| LLM Inference Engine  |             |    External Tools     |
+| (Foundation Model)    |             |     (MCP Servers)     |
+|                       |             |  - Vector RAG         |
+| - Pure Reasoning      |             |  - Direct Graph RAG   |
+| - Tool Call Decision  |             |  - GraphRAG           |
++-----------------------+             +-----------------------+
+            │                                     │
+            │ (2) Tool Call Intent (JSON)         │ (4) Observation Data
+            └─────────────────────────────────────┘
+```
+
+### 1-2. 
+
+https://cdn.openai.com/pdf/37dce0c6-b190-4cf6-b6b9-2651fe6af98a/%E3%82%A8%E3%83%BC%E3%82%B7%E3%82%99%E3%82%A7%E3%83%B3%E3%83%88%E6%A7%8B%E7%AF%89%E5%AE%9F%E8%B7%B5%E3%82%AB%E3%82%99%E3%82%A4%E3%83%88%E3%82%99.pdf
 
 # 2. 課題解決の2つのアプローチ（RAG vs ファインチューニング）
 
