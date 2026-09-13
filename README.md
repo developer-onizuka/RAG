@@ -42,16 +42,16 @@ AIエージェントシステムにおいて、LLMはテキスト推論エンジ
 ```text
 +-----------------------------------------------------------------------+
 |                                 User                                  |
-+-----------------------------------------------------------------------+
++-------+-------------------------------------------------------+-------+
         │                                                       ▲
-        │ (1) User Request                                      │ (7) Final Answer
+        │ (0) User Request                                      │ (7) Final Answer
         ▼                                                       │
-+-----------------------------------------------------------------------+
++-------+-------------------------------------------------------+-------+
 |       Application Layer / MCP Client (Orchestrator Scope)             |
 |  - Tool Binding & Schema Management (MCP Protocol)                    |
-|  - Context & Conversation State Tracking                              |<--+
+|  - Context & Conversation State Tracking                              +<--+
 |  - Dispatch Loop & Execution Handling                                 |   |
-+-----------------------------------------------------------------------+   |
++----+--------------+-----------------------------+--------------+------+   |
      │              ▲                             │              ▲          |
  (1) Prompt      (2) Tool Call Intent     (3) Execute     (4) Observation   |
      & Schemas       (JSON)                       Tool            Data      |
@@ -59,14 +59,14 @@ AIエージェントシステムにおいて、LLMはテキスト推論エンジ
  (5) Prompt + Observation                         │              │          |
      │              │                             │              │          |
      ▼              │                             ▼              │          |
-+-------------------------------+             +-------------------------+   |
++----+--------------+-----------+             +---+--------------+------+   |
 | LLM Inference Engine          |             | External Tools          |   |
 | (Instruct / Alignment Model)  |             | (MCP Servers)           |   |
 |                               |             | - Vector RAG            |   |
 | - Pure Reasoning              |             | - Direct Graph RAG      |   |
 | - Tool Call Decision          |             | - GraphRAG              |   |
 | - Final Answer Generation     |             |                         |   |
-+-------------------------------+             +-------------------------+   |
++----+--------------------------+             +-------------------------+   |
      |                                                                      |
      +──────────────────────────────────────────────────────────────────────+ (6) Final Response
                                                         (To App Layer)
