@@ -40,35 +40,61 @@ AIエージェントシステムにおいて、LLMはテキスト推論エンジ
 ### System Architecture Diagram
 
 ```text
-+-------------------------------------------------------------+
-|               User / Application Interface                  |
-+-------------------------------------------------------------+
-                              │
-                              │ (User Request)
-                              ▼
-+-------------------------------------------------------------+
-|   Application Layer / MCP Client (FDE & AI Engineer Scope)  |
-|   - Tool Binding & Schema Management (MCP Protocol)         |
-|   - Context & Conversation State Tracking                   |
-|   - Orchestration Loop & Dynamic Routing                    |
-|   - Tool Execution & Result Feedback Handling               |
-+-------------------------------------------------------------+
-            │                                     │
- (1) System Prompt + Tool Schemas         (3) Execute Tool Call
-     & User Query                             & Fetch Data
-            │                                     │
-            ▼                                     ▼
-+-----------------------+             +-----------------------+
-| LLM Inference Engine  |             |    External Tools     |
-| (Foundation Model)    |             |     (MCP Servers)     |
-|                       |             |  - Vector RAG         |
-| - Pure Reasoning      |             |  - Direct Graph RAG   |
-| - Tool Call Decision  |             |  - GraphRAG           |
-+-----------------------+             +-----------------------+
-            │                                     │
-            │ (2) Tool Call Intent (JSON)         │ (4) Observation Data
-            └─────────────────────────────────────┘
++-----------------------------------------------------------------------+
+|                    User / Application Interface                       |
++-----------------------------------------------------------------------+
+        │                                                       ▲
+        │ (1) User Request                                      │ (7) Final Answer
+        ▼                                                       │
++-----------------------------------------------------------------------+
+|       Application Layer / MCP Client (Orchestrator Scope)             |
+|  - Tool Binding & Schema Management (MCP Protocol)                    |
+|  - Context & Conversation State Tracking                              |<--+
+|  - Dispatch Loop & Execution Handling                                 |   |
++-----------------------------------------------------------------------+   |
+     │              ▲                             │              ▲          |
+ (1) Prompt      (2) Tool Call Intent     (3) Execute     (4) Observation   |
+     & Schemas       (JSON)                       Tool            Data      |
+     │              │                             │              │          |
+ (5) Prompt + Observation                         │              │          |
+     │              │                             │              │          |
+     ▼              │                             ▼              │          |
++-------------------------------+             +-------------------------+   |
+| LLM Inference Engine          |             | External Tools          |   |
+| (Instruct / Alignment Model)  |             | (MCP Servers)           |   |
+|                               |             | - Vector RAG            |   |
+| - Pure Reasoning              |             | - Direct Graph RAG      |   |
+| - Tool Call Decision          |             | - GraphRAG              |   |
+| - Final Answer Generation     |             |                         |   |
++-------------------------------+             +-------------------------+   |
+     |                                                                      |
+     +──────────────────────────────────────────────────────────────────────+ (6) Final Response
+                                                        (To App Layer)
 ```
+
+####（1）プロンプトとツール定義の送出
+
+アプリケーション（MCPクライアント）が、ユーザーのクエリにシステムプロンプトやツール一覧（JSON Schema）を統合し、LLMの推論エンジンへ入力します。
+
+####（2）LLMによる判断と意図の出力
+
+LLMがテキストの意味を解釈し、「回答にツールが必要である」と判定した場合、ツールの名前と引数を指定したJSON構造（Tool Call Intent）を出力します。※この時点ではLLMはツールを直接実行していません。
+
+####（3）外部ツールの代理実行
+
+アプリケーション（MCPクライアント）がLLMから返されたJSONを解釈し、実際の外部ツール（VectorDBやGraphDBなど）へクエリを発行して処理を実行します。
+
+####（4）Observation（観察データ）の回収
+
+外部ツールでの処理結果（検索結果やレスポンスデータ）がアプリケーションに返却されます。
+
+####（5）コンテキストの再構築と再問合せ
+
+アプリケーションが回収したデータを会話履歴（Context）に組み込み、「このツール実行結果を踏まえて回答を作成してください」というプロンプトを構築して、再びLLMに入力します。
+
+####（6）最終回答の生成
+
+LLMが入力されたObservationデータを読み込み、ユーザーの元々の質問に対する自然言語の最終回答を生成してアプリケーションへ返します。（その後、アプリからユーザーへ提示されます）
 
 ### 1-2. OpenAI エージェント構築ガイド
 
