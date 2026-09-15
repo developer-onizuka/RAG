@@ -3,9 +3,9 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY graphRAG.py .
+COPY graphRAG-mcp.py .
 RUN mkdir -p /app/data/input /app/data/output
-EXPOSE 5001
+EXPOSE 5001 8080
 ENV OLLAMA_BASE_URL="http://svc-ollama:11434/v1"
 ENV LLM_MODEL="llama3.2:3b"
-CMD ["python", "graphRAG.py"]
+CMD ["python", "graphRAG-mcp.py"]

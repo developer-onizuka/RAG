@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: graphrag-mcp
+  labels:
+    app: graphrag-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: graphrag-mcp
+  template:
+    metadata:
+      labels:
+        app: graphrag-mcp
+    spec:
+      containers:
+      - name: mcp-app
+        image: developeronizuka/graphrag-mcp:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5001
+          name: mcp-port
+        - containerPort: 8080
+          name: web-port
+        env:
+        - name: OLLAMA_BASE_URL
+          value: "http://svc-ollama:11434/v1"
+        - name: LLM_MODEL
+          value: "llama3.2:3b"
+        #volumeMounts:
+        #- name: data-store
+        #  mountPath: /app/data
+      #volumes:
+      #- name: data-store
+      #  persistentVolumeClaim:
+      #    claimName: graphrag-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-graphrag-mcp
+spec:
+  type: LoadBalancer
+  selector:
+    app: graphrag-mcp
+  ports:
+  - name: mcp-sse
+    port: 5001
+    targetPort: 5001
+  - name: web-ui
+    port: 8080
+    targetPort: 8080
