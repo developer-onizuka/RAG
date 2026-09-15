@@ -195,45 +195,7 @@ https://cdn.openai.com/pdf/37dce0c6-b190-4cf6-b6b9-2651fe6af98a/%E3%82%A8%E3%83%
 
 # 5. RAGの比較実験
 
-### 5-1. GraphRAG環境の展開
-```
-kubectl apply -f graphrag-mcp.yaml 
-```
-
-### 5-1-1. ClaudeDesktopとの連携
-ClaudeDesktopからGraphRAGを操作するために、claude_desktop_config.jsonに以下を追加し、ClaudeDesktopを再起動します。
-```
-  "mcpServers": {
-    "GraphRAG": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-remote",
-        "http://192.168.33.4:5001/sse",
-        "--allow-http"
-      ]
-    },
-```
-### 5-1-2. ClaudeDesktopでの実行時画面
-ここでは、ドラゴンボールのストーリーをもとにグラフナレッジを構成します。
-
-#### register_document_and_index
-<img src="https://github.com/developer-onizuka/RAG/blob/main/register_document_and_index.png" width="720"><br>
-
-#### generate_visualization_html
-<img src="https://github.com/developer-onizuka/RAG/blob/main/generate_visualization_html.png" width="720"><br>
-
-#### knowledge-graph
-<img src="https://github.com/developer-onizuka/RAG/blob/main/knowledge-graph.png" width="720"><br>
-
-#### Example
-```
-魔人ブウに対抗するためにフュージョンした2人の少年のそれぞれの父親と母親の人間関係・出会いの経緯を教えてください。
-```
-<img src="https://github.com/developer-onizuka/RAG/blob/main/example1.png" width="720"><br>
-
-### 5-1-3. 架空のドキュメント
-以下の架空のドキュメントをもとにグラフナレッジ化します。
+以下の架空のドキュメントをもとに、VectorDBとグラフナレッジを作成します。
 ```
 === インフラ・開発チーム雑記＆障害振り返りメモ（未整理） ===
 
@@ -262,10 +224,191 @@ NotificationService経由のメール送信が全部エラーになった件。
 本番環境（ProdDB）へのアクセス経路がガバガバ。開発VPCから直接ProdDBにアクセスできるルートが残ってるのヤバすぎる。アクセス経路絞って、Bastion（踏み台）経由＋VPC Peeringで厳格に分離してくれ。
 あと上述の通り、IAMポリシーで権限与えすぎ問題と、AuthService/SessionCache周辺のSPOF（単一障害点）放置は早急にインフラチームで対応すること。
 ```
+
+### 5-1. VectorRAG環境の展開
+```
+kubectl apply -f vectorrag-mcp.yaml
+```
+```
+$ kubectl get svc svc-vectorrag-mcp
+NAME                TYPE           CLUSTER-IP       EXTERNAL-IP    PORT(S)          AGE
+svc-vectorrag-mcp   LoadBalancer   10.100.222.107   192.168.33.6   5001:31921/TCP   56m
+```
+### 5-1-1. ClaudeDesktopとの連携
+ClaudeDesktopからVectorRAGを操作するために、claude_desktop_config.jsonに以下を追加し、ClaudeDesktopを再起動します。
+```
+  "mcpServers": {
+    "GraphRAG": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://192.168.33.4:5001/sse",
+        "--allow-http"
+      ]
+    },
+```
+### 5-1-2. VectorDBへの登録
+ClaudeDesktopにて、以下のプロンプトを実行します。
+```
+次の文章をVectorDBに登録してください。
+<先述の架空のドキュメントの内容をペースト>
+```
+
+### 5-1-3. VectorRAGの結果
+以下のプロンプトを実行します。
+```
+当社におけるセキュリティ上の懸念点や、過去の障害を踏まえた改善策を教えてください。
+```
+
+### 5-1-4. 出力結果
+```
+検索結果と登録済みメモの内容を踏まえて、セキュリティ上の懸念点と改善策を整理します。
+
+## セキュリティ上の懸念点
+
+**1. IAMポリシーの過剰権限（ワイルドカード設定）**
+INC-202601で、サービス間通信用のIAMロールに `resource: "*"` という過剰な権限が設定されており、これが原因で作業者が意図しないリソースを上書きできてしまう状態でした。この設定ミスと外部APIキーの期限切れが重なり、NotificationServiceのメール送信が全滅する障害に直結しています。
+
+**2. 本番環境（ProdDB）へのアクセス経路の不備**
+セキュリティ監査で、開発VPCから本番DBへ直接アクセスできる経路が残っていることが指摘されています。Bastion経由・VPC Peeringによる厳格な分離ができていません。
+
+**3. AuthService/SessionCache周辺のSPOF（単一障害点）**
+SessionCache（Redis）が1台構成のままで、マルチAZクラスタ化の話が出ているにもかかわらず放置されています。INC-202510では、このSessionCacheのOOM KillがAuthServiceの全系停止を招きました。
+
+## 過去の障害を踏まえた改善策
+
+**INC-202510（AuthService全系停止）関連**
+- SessionCacheのマルチAZクラスタ化、一時キャッシュとセッションデータの分離
+- AuthService障害時に後続サービス（PaymentService等）が巻き添えにならないよう、サーキットブレーカーの導入
+
+**INC-202405（PaymentServiceのDBコネクション枯渇）関連**
+- 決済履歴テーブルのインデックス見直し
+- 定期的なスロークエリモニタリングの実施
+- コネクションプールのチューニング
+
+**INC-202601（IAM設定ミスによるメール送信障害）関連**
+- ワイルドカード（`*`）権限の全廃
+- 最小権限の原則（PoLP）の徹底
+- IAMロールの定期監査タスクの新設
+
+**セキュリティ監査指摘事項関連**
+- 本番DBへのアクセス経路をBastion経由＋VPC Peeringに厳格化し、開発VPCからの直接アクセスを遮断
+
+---
+
+サービス依存関係（UserPortal→AuthService/OrderService、OrderService→PaymentService、PaymentService→AuthService、NotificationService←OrderServiceイベント）を見ると、**AuthServiceとPaymentServiceが障害連鎖の起点になりやすい構造**であることも分かります。特にAuthServiceは複数サービスから直接叩かれているため、SPOF解消とサーキットブレーカー導入が優先度高めと言えそうです。
+```
+
+### 5-2. GraphRAG環境の展開
+```
+kubectl apply -f graphrag-mcp.yaml 
+```
+```
+$ kubectl get svc svc-graphrag-mcp 
+NAME               TYPE           CLUSTER-IP     EXTERNAL-IP    PORT(S)                         AGE
+svc-graphrag-mcp   LoadBalancer   10.111.34.23   192.168.33.4   5001:30330/TCP,8080:32044/TCP   143m
+```
+
+### 5-2-1. ClaudeDesktopとの連携
+ClaudeDesktopからGraphRAGを操作するために、claude_desktop_config.jsonに以下を追加し、ClaudeDesktopを再起動します。
+```
+  "mcpServers": {
+    "GraphRAG": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://192.168.33.4:5001/sse",
+        "--allow-http"
+      ]
+    },
+```
+
+### 5-2-2. GraphRAGによるグラフナレッジ化
+ClaudeDesktopにて、以下のプロンプトを実行します。
+```
+次に以下の文章をGraphRAGにナレッジグラフとして登録してください。
+<先述の架空のドキュメントの内容をペースト>
+```
+
 これをもとに作成されたナレッジグラフは以下です。
 
 <img src="https://github.com/developer-onizuka/RAG/blob/main/knowledge-graph2.png" width="480"><br>
 
+### 5-2-3. GraphRAGの結果
+以下のプロンプトを実行します。
+```
+当社におけるセキュリティ上の懸念点や、過去の障害を踏まえた改善策を教えてください。
+```
 
-### 5-2. GraphDB環境の展開
+### 5-2-4. 出力結果
+```
+ナレッジグラフ（構造的な関係性）とVectorDB（意味的な検索）の両方を突き合わせた結果を整理します。
 
+## セキュリティ上の懸念点
+
+**1. IAM権限の過剰付与（ワイルドカード設定）**
+グラフ上では `Inc-202601 --AFFECTED_BY--> Iamロール --AFFECTED_BY--> Resource: "*"` という因果連鎖が明示されており、VectorDB側もこれを裏付けています。サービス間通信用IAMロールに `resource: "*"` が設定され過剰権限状態となり、作業者が意図しないリソースを上書き操作できてしまったことがINC-202601の直接トリガーでした。
+
+**2. 本番DB（ProdDB）へのアクセス経路の不備**
+グラフでは `開発Vpc --CONNECTION--> Proddb`、`Proddb --CONNECTION--> Bastion/Iamポリシー` という関係が抽出されており、開発VPCから本番DBへ直接アクセスできる経路が残存していることが構造的にも確認できます。Bastion＋VPC Peeringでの分離が未完了です。
+
+**3. AuthService/SessionCache周辺のSPOF（単一障害点）**
+グラフの `権限 --CONNECTION--> Spof --CONNECTION--> インフラチーム` という接続、および `Sessioncache --CAUSED_BY--> マルチAz --IMPLIES--> クラスタ化` という関係が示す通り、SessionCacheが1台構成のままクラスタ化が放置されている点がIAM問題と並んで「インフラチーム早急対応事項」として括られています。
+
+## 過去の障害を踏まえた改善策
+
+| インシデント | 根本原因（グラフ上の因果） | 改善策 |
+|---|---|---|
+| INC-202510（AuthService全系停止） | `Inc-202510 --CAUSED_BY--> Oom Kill`／`Authservice --NEEDS--> サーキットブレーカー` | SessionCacheのマルチAZクラスタ化、一時キャッシュとセッションデータの分離、AuthService障害時の後続サービス巻き添え防止のためサーキットブレーカー導入 |
+| INC-202405（PaymentService詰まり） | `Db --CONTAINS--> インデックス --CONTAINS--> インデックス見直し／定期的なスロークエリモニタリング／チューニング` | DBインデックス見直し、定期的なスロークエリモニタリング、コネクションプールのチューニング |
+| INC-202601（メール送信全滅） | `Inc-202601 --CAUSED_BY--> 過剰権限／上書き操作` | ワイルドカード権限の全廃、最小権限の原則（PoLP）徹底、IAMロールの定期監査タスク新設 |
+| セキュリティ監査指摘 | `開発Vpc --CONNECTION--> Proddb`（直接経路残存） | Bastion経由＋VPC Peeringによる厳格なアクセス経路分離 |
+
+## サービス依存構造からの示唆
+グラフの `Userportal --CALLS--> Authservice/Orderservice`、`Orderservice --CALLS--> Paymentservice/Notificationservice` という呼び出し関係から、**AuthServiceとOrderServiceがハブとなって障害を連鎖させやすい構造**であることが分かります。実際、PaymentServiceの詰まりがOrderService経由でNotificationServiceまで波及した（INC-202405）ように、この依存構造を放置するとSPOF解消をしてもボトルネックが移動するだけになりかねません。**サーキットブレーカーの導入はAuthServiceだけでなくOrderService⇄PaymentService間にも広げる**ことが望ましいと考えられます。
+```
+
+# 6. 結果の比較
+VectorDB単体でも過去障害の事実や個別対策を網羅できていますが、GraphRAG（＋VectorDB）を突き合わせた結果は「多段依存の追跡」と「システム全体の構造的インサイトの導出」において決定的な差が現れています。
+
+両者の比較における主な違いは以下の通りです。
+
+### 6-1. 多段依存関係の連結・追跡能力
+
+VectorDB単体: チャンク内に書かれた「UserPortal→AuthService」や「PaymentService→AuthService」といった局所的な関係性を文字列として拾い出し、要約しています。
+
+GraphRAG結合: Userportal --CALLS--> Authservice/Orderservice から Orderservice --CALLS--> Paymentservice/Notificationservice という複数チャンクに跨るノード・エッジを連結し、障害が末端の NotificationService まで波及する長鎖の連鎖経路を構造的に再現しています。
+
+### 6-2. 構造的インサイト（提案の質）の深さ
+
+VectorDB単体: ドキュメントに記載された各障害の改善策（Redisクラスタ化、IAMワイルドカード廃止など）を素直に箇条書きで並べるにとどまります。
+
+GraphRAG結合: グラフの呼び出し構造全体を俯瞰し、「AuthServiceのSPOFを解消しても、依存構造上ボトルネックが OrderService ↔ PaymentService に移動するだけになる」という、テキストに直接書かれていない大域的なリスクと改善提案（サーキットブレーカー適用範囲の拡大） を自発的に導出できています。
+
+### 6-3. 因果関係の説明性（Explainability）
+
+VectorDB単体: 類似テキストをまとめた文章回答となるため、なぜその改善策が必要なのかの根拠が文章に依存します。
+
+GraphRAG結合: Inc-202601 --AFFECTED_BY--> Iamロール --AFFECTED_BY--> Resource: "*" のように、事象・リソース・原因のグラフパスが提示されるため、判定根拠が極めて明確かつ追尾可能です。
+
+単純な事実抽出や個別対策のリストアップであればVectorDBのみでも実用レベルですが、本件のように「システム間の複雑な相互作用」や「隠れたボトルネックの特定」が求められるシチュエーションでは、関係性を構造として保持するGraphRAGの優位性が明確に出ています。
+
+
+### 付録. ドラゴンボールのストーリーのグラフナレッジ化
+
+#### register_document_and_index
+<img src="https://github.com/developer-onizuka/RAG/blob/main/register_document_and_index.png" width="720"><br>
+
+#### generate_visualization_html
+<img src="https://github.com/developer-onizuka/RAG/blob/main/generate_visualization_html.png" width="720"><br>
+
+#### knowledge-graph
+<img src="https://github.com/developer-onizuka/RAG/blob/main/knowledge-graph.png" width="720"><br>
+
+#### Example
+```
+魔人ブウに対抗するためにフュージョンした2人の少年のそれぞれの父親と母親の人間関係・出会いの経緯を教えてください。
+```
+<img src="https://github.com/developer-onizuka/RAG/blob/main/example1.png" width="720"><br>
