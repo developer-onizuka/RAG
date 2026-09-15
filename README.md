@@ -1,7 +1,7 @@
 # RAG
 
 # 0. Goal
-本リポジトリは、単体LLMの限界（ハルシネーション・非公開データの欠落）を外部ツール連携によって克服するエージェント化の過程を整理したものです。各種エージェントの分類に加え、主要ユースケースであるRAG（Vector RAG / Direct RAG / GraphRAG）の3手法を比較。クエリ特性（局所照会・依存関係追跡・構造分析）に応じた使い分けの基準を整え、RAGの実装方針を考えていくものです。
+本リポジトリは、単体LLMの限界（ハルシネーション・非公開データの欠落）を外部ツール連携によって克服するエージェント化の過程を整理したものです。各種エージェントの分類に加え、主要ユースケースであるRAG（Vector RAG / Direct RAG / GraphRAG）の3手法を比較。クエリ特性（局所照会・依存関係追跡・構造分析）に応じた使い分けの基準を整え、RAGの実装方針を考えていくものです。後半で、GraphRAGを実装し、そのほかのRAGと結果を比較した実験をしています。
 
 # 1. LLMの進化段階とアーキテクチャの階層
 
@@ -193,14 +193,14 @@ https://cdn.openai.com/pdf/37dce0c6-b190-4cf6-b6b9-2651fe6af98a/%E3%82%A8%E3%83%
 | **強みと評価** | **🔺 個別ファクトは増えるが全体要約は不可**<br>Vectorがテキスト文章を拾えるため「完全な破綻」は防げるが、GraphDB側に全体を要約する構造がないため、総合的な改善提案までは作れない。 | **⭕ 最強の分析力（ミクロの事実 ＋ マクロの要約）**<br>GraphRAGが得意な「全体像・定性分析」に、Vector検索が得意な「最新・生のピンポイント記述」が合体し、**木も森も両方見える最高の回答**になる。 |
 
 
-# 5. GraphRAG
+# 5. RAGの比較実験
 
 ### 5-1. GraphRAG環境の展開
 ```
 kubectl apply -f graphrag-mcp.yaml 
 ```
 
-### 5-2. ClaudeDesktopとの連携
+### 5-1-1. ClaudeDesktopとの連携
 ClaudeDesktopからGraphRAGを操作するために、claude_desktop_config.jsonに以下を追加し、ClaudeDesktopを再起動します。
 ```
   "mcpServers": {
@@ -214,19 +214,42 @@ ClaudeDesktopからGraphRAGを操作するために、claude_desktop_config.json
       ]
     },
 ```
-### 5-2. ClaudeDesktopでの実行時画面
+### 5-1-2. ClaudeDesktopでの実行時画面
+ここでは、ドラゴンボールのストーリーをもとにグラフナレッジを構成します。
 
-#### 5-2-1. register_document_and_index
+#### register_document_and_index
 <img src="https://github.com/developer-onizuka/RAG/blob/main/register_document_and_index.png" width="720"><br>
 
-#### 5-2-2. generate_visualization_html
+#### generate_visualization_html
 <img src="https://github.com/developer-onizuka/RAG/blob/main/generate_visualization_html.png" width="720"><br>
 
-#### 5-2-3. knowledge-graph
+#### knowledge-graph
 <img src="https://github.com/developer-onizuka/RAG/blob/main/knowledge-graph.png" width="720"><br>
 
-#### 5-2-4. Example
+#### Example
 ```
 魔人ブウに対抗するためにフュージョンした2人の少年のそれぞれの父親と母親の人間関係・出会いの経緯を教えてください。
 ```
 <img src="https://github.com/developer-onizuka/RAG/blob/main/example1.png" width="720"><br>
+
+### 5-1-3. 架空のストーリー
+以下の架空のストーリーをもとにグラフナレッジ化します。
+```
+1985年にAppleを去ったスティーブ・ジョブズ氏は、元同僚のエンジニアである佐藤さんと、実業家の田中さんと共に新たな事業を立ち上げた。佐藤さんはジョブズ氏が設立したNeXT社において、革新的なオペレーティングシステム「SATO-OS」を独力で開発し、後のMac OS Xの礎を築いた。一方、田中さんは資金援助を行う代わりに、当時苦境に立たされていたアニメーション制作会社「Pixar」の買収をジョブズ氏に強く進言した。田中さんの助言で買収が決まると、Pixarは佐藤さんが独自開発した画像描画チップ「Sato-Processor」を採用し、世界初のフルCG長編アニメ映画『トイ・ストーリー』の制作に成功した。1997年にAppleへ復帰したジョブズ氏は、佐藤さんを最高技術責任者（CTO）に任命し、田中さんを経営顧問として迎えた。2001年に発表され大ヒットした「iPod」の象徴的な操作画面「クリックホイール」は、実は田中さんが日常のダイヤル式電話から着想を得て提案したものであり、その内部で動作する超高速データ転送プロトコルは佐藤さんが設計したものであった。
+```
+これをもとに作成されたナレッジグラフは以下です。
+
+<img src="https://github.com/developer-onizuka/RAG/blob/main/knowledge-graph2.png" width="720"><br>
+
+#### 架空のストーリーをもとにした推論結果
+架空のストーリーに忠実な結果がでています。
+
+<img src="https://github.com/developer-onizuka/RAG/blob/main/example2.png" width="720"><br>
+
+#### 事実＆史実をもとにした推論結果
+以下のようにある意味、ハルシネーションしています。（史実としては正しいのですが。）
+
+<img src="https://github.com/developer-onizuka/RAG/blob/main/example3.png" width="720"><br>
+
+### 5-2. GraphDB環境の展開
+
