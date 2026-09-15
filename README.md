@@ -265,7 +265,7 @@ ClaudeDesktopにて、以下のプロンプトを実行します。
 
 検索結果と登録済みメモの内容を踏まえて、セキュリティ上の懸念点と改善策を整理します。
 
-## セキュリティ上の懸念点
+#### セキュリティ上の懸念点
 
 **1. IAMポリシーの過剰権限（ワイルドカード設定）**
 INC-202601で、サービス間通信用のIAMロールに `resource: "*"` という過剰な権限が設定されており、これが原因で作業者が意図しないリソースを上書きできてしまう状態でした。この設定ミスと外部APIキーの期限切れが重なり、NotificationServiceのメール送信が全滅する障害に直結しています。
@@ -276,7 +276,7 @@ INC-202601で、サービス間通信用のIAMロールに `resource: "*"` と�
 **3. AuthService/SessionCache周辺のSPOF（単一障害点）**
 SessionCache（Redis）が1台構成のままで、マルチAZクラスタ化の話が出ているにもかかわらず放置されています。INC-202510では、このSessionCacheのOOM KillがAuthServiceの全系停止を招きました。
 
-## 過去の障害を踏まえた改善策
+#### 過去の障害を踏まえた改善策
 
 **INC-202510（AuthService全系停止）関連**
 - SessionCacheのマルチAZクラスタ化、一時キャッシュとセッションデータの分離
@@ -345,7 +345,7 @@ ClaudeDesktopにて、以下のプロンプトを実行します。
 
 ナレッジグラフ（構造的な関係性）とVectorDB（意味的な検索）の両方を突き合わせた結果を整理します。
 
-## セキュリティ上の懸念点
+#### セキュリティ上の懸念点
 
 **1. IAM権限の過剰付与（ワイルドカード設定）**
 グラフ上では `Inc-202601 --AFFECTED_BY--> Iamロール --AFFECTED_BY--> Resource: "*"` という因果連鎖が明示されており、VectorDB側もこれを裏付けています。サービス間通信用IAMロールに `resource: "*"` が設定され過剰権限状態となり、作業者が意図しないリソースを上書き操作できてしまったことがINC-202601の直接トリガーでした。
@@ -356,7 +356,7 @@ ClaudeDesktopにて、以下のプロンプトを実行します。
 **3. AuthService/SessionCache周辺のSPOF（単一障害点）**
 グラフの `権限 --CONNECTION--> Spof --CONNECTION--> インフラチーム` という接続、および `Sessioncache --CAUSED_BY--> マルチAz --IMPLIES--> クラスタ化` という関係が示す通り、SessionCacheが1台構成のままクラスタ化が放置されている点がIAM問題と並んで「インフラチーム早急対応事項」として括られています。
 
-## 過去の障害を踏まえた改善策
+#### 過去の障害を踏まえた改善策
 
 | インシデント | 根本原因（グラフ上の因果） | 改善策 |
 |---|---|---|
@@ -365,7 +365,7 @@ ClaudeDesktopにて、以下のプロンプトを実行します。
 | INC-202601（メール送信全滅） | `Inc-202601 --CAUSED_BY--> 過剰権限／上書き操作` | ワイルドカード権限の全廃、最小権限の原則（PoLP）徹底、IAMロールの定期監査タスク新設 |
 | セキュリティ監査指摘 | `開発Vpc --CONNECTION--> Proddb`（直接経路残存） | Bastion経由＋VPC Peeringによる厳格なアクセス経路分離 |
 
-## サービス依存構造からの示唆
+#### サービス依存構造からの示唆
 グラフの `Userportal --CALLS--> Authservice/Orderservice`、`Orderservice --CALLS--> Paymentservice/Notificationservice` という呼び出し関係から、**AuthServiceとOrderServiceがハブとなって障害を連鎖させやすい構造**であることが分かります。実際、PaymentServiceの詰まりがOrderService経由でNotificationServiceまで波及した（INC-202405）ように、この依存構造を放置するとSPOF解消をしてもボトルネックが移動するだけになりかねません。**サーキットブレーカーの導入はAuthServiceだけでなくOrderService⇄PaymentService間にも広げる**ことが望ましいと考えられます。
 
 
