@@ -192,6 +192,41 @@ https://cdn.openai.com/pdf/37dce0c6-b190-4cf6-b6b9-2651fe6af98a/%E3%82%A8%E3%83%
 | **実際の回答** | 「2025年10月にSessionCacheのメモリ枯渇障害が発生しています。またセキュリティ規定VPC_Policyに基づき、以下のパラメータが設定されています……（全体分析は不可）」 | 「【全体分析】1. **単一障害点:** 決済基盤のRedis依存が最大の可用性リスクです。<br>【最新の個別事実】2. **直近の動き:** 先月の監査ログ（Vector取得）により、一部の権限管理で運用漏れが検知されています。」 |
 | **強みと評価** | **🔺 個別ファクトは増えるが全体要約は不可**<br>Vectorがテキスト文章を拾えるため「完全な破綻」は防げるが、GraphDB側に全体を要約する構造がないため、総合的な改善提案までは作れない。 | **⭕ 最強の分析力（ミクロの事実 ＋ マクロの要約）**<br>GraphRAGが得意な「全体像・定性分析」に、Vector検索が得意な「最新・生のピンポイント記述」が合体し、**木も森も両方見える最高の回答**になる。 |
 
+
+# 5. GraphRAG
+
+### 5-1. GraphRAG環境の展開
 ```
-pip install fastmcp langchain langchain-experimental langchain-openai networkx pandas pyarrow pyvis
+kubectl apply -f graphrag-mcp.yaml 
 ```
+
+### 5-2. ClaudeDesktopとの連携
+ClaudeDesktopからGraphRAGを操作するために、claude_desktop_config.jsonに以下を追加し、ClaudeDesktopを再起動します。
+```
+  "mcpServers": {
+    "GraphRAG": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://192.168.33.4:5001/sse",
+        "--allow-http"
+      ]
+    },
+```
+### 5-2. ClaudeDesktopでの実行時画面
+
+#### 5-2-1. register_document_and_index
+<img src="https://github.com/developer-onizuka/RAG/blob/main/register_document_and_index.png" width="720"><br>
+
+#### 5-2-2. generate_visualization_html
+<img src="https://github.com/developer-onizuka/RAG/blob/main/generate_visualization_html.png" width="720"><br>
+
+#### 5-2-3. knowledge-graph
+<img src="https://github.com/developer-onizuka/RAG/blob/main/knowledge-graph.png" width="720"><br>
+
+#### 5-2-4. Example
+```
+魔人ブウに対抗するためにフュージョンした2人の少年のそれぞれの父親と母親の人間関係・出会いの経緯を教えてください。
+```
+<img src="https://github.com/developer-onizuka/RAG/blob/main/example1.png" width="720"><br>
