@@ -1,6 +1,10 @@
 import asyncio
+import http.server
 import os
+import socketserver
+import threading
 import time
+import webbrowser
 from fastmcp import FastMCP
 from langchain_core.documents import Document
 from langchain_experimental.graph_transformers import LLMGraphTransformer
@@ -15,6 +19,7 @@ INPUT_DIR = f"{ROOT_DIR}/input"
 OUTPUT_DIR = f"{ROOT_DIR}/output"
 GRAPH_FILE = f"{OUTPUT_DIR}/knowledge_graph.graphml"
 HTML_FILE = f"{OUTPUT_DIR}/graph.html"
+WEB_PORT = 8080
 
 os.makedirs(INPUT_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -25,6 +30,23 @@ LLM_MODEL = os.getenv("LLM_MODEL", "llama3.2:3b")
 indexing_jobs = {}
 
 mcp = FastMCP("GraphRAG Indexer & Visualizer MCP (LangChain + Ollama)")
+
+
+def start_local_web_server():
+    """outputディレクトリをルートとした簡易Webサーバーをバックグラウンドで起動"""
+
+    class Handler(http.server.SimpleHTTPRequestHandler):
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=OUTPUT_DIR, **kwargs)
+
+    def run_server():
+        socketserver.TCPServer.allow_reuse_address = True
+        with socketserver.TCPServer(("", WEB_PORT), Handler) as httpd:
+            httpd.serve_forever()
+
+    server_thread = threading.Thread(target=run_server, daemon=True)
+    server_thread.start()
 
 
 def load_or_create_graph() -> nx.DiGraph:
@@ -150,15 +172,20 @@ async def list_jobs() -> str:
 
 
 @mcp.tool()
-async def generate_visualization_html() -> str:
-    """現在のナレッジグラフからインタラクティブなHTML可視化ファイル(graph.html)を生成・更新します"""
+async def generate_visualization_html(auto_open: bool = True) -> str:
+    """現在のナレッジグラフからインタラクティブなHTML可視化ファイルを生成し、Webブラウザで自動表示します。
+
+    Args:
+        auto_open: Trueの場合、生成後にPCの既定ブラウザで自動的に可視化画面を開きます。
+    """
     if not os.path.exists(GRAPH_FILE):
         return f"エラー: ナレッジグラフファイル '{GRAPH_FILE}' が見つかりません。先にドメイン登録を実行してください。"
 
     try:
+
         def _build_html():
             G = nx.read_graphml(GRAPH_FILE)
-            net = Network(height="800px", width="100%", notebook=False, directed=True)
+            net = Network(height="850px", width="100%", notebook=False, directed=True)
             net.from_nx(G)
             net.toggle_physics(True)
             net.write_html(HTML_FILE)
@@ -166,14 +193,19 @@ async def generate_visualization_html() -> str:
 
         num_nodes, num_edges = await asyncio.to_thread(_build_html)
 
+        url = f"http://localhost:{WEB_PORT}/graph.html"
+        if auto_open:
+            webbrowser.open(url)
+
         return (
-            f"成功: 可視化HTMLファイルを生成しました。\n"
-            f"保存先: {HTML_FILE}\n"
-            f"ノード数: {num_nodes}, エッジ数: {num_edges}\n"
-            f"※ ブラウザで '{HTML_FILE}' を開くことでインタラクティブにノード関係を確認できます。"
+            f"成功: 可視化HTMLファイルを生成し、Webサーバー経由で公開しました。\n"
+            f"・アクセスURL: {url}\n"
+            f"・ノード数: {num_nodes}, エッジ数: {num_edges}\n"
+            f"※ 自動でブラウザが開かない場合は上記URLを開いてください。"
         )
     except Exception as e:
         return f"エラー: 可視化HTMLの生成中に例外が発生しました: {str(e)}"
+
 
 @mcp.tool()
 async def query_knowledge_graph(domain: str = None, prompt: str = "") -> str:
@@ -184,9 +216,9 @@ async def query_knowledge_graph(domain: str = None, prompt: str = "") -> str:
     Args:
         domain: 検索対象のドメイン。省略時は全ドメイン。
         prompt: 開発検証用のプロンプト
+    """
     if not os.path.exists(GRAPH_FILE):
         return f"エラー: ナレッジグラフファイル '{GRAPH_FILE}' が見つかりません。"
-    """
 
     try:
         G = nx.read_graphml(GRAPH_FILE)
@@ -238,6 +270,7 @@ async def query_knowledge_graph(domain: str = None, prompt: str = "") -> str:
     except Exception as e:
         return f"エラー: 質問処理中に例外が発生しました: {str(e)}"
 
+
 @mcp.tool()
 async def get_graph_context(domain: str = "", entity: str = "") -> str:
     """Claude DesktopなどのLLMクライアント向けに、ナレッジグラフから関連する関係性（コンテキスト）を抽出してテキストで返します。
@@ -270,7 +303,11 @@ async def get_graph_context(domain: str = "", entity: str = "") -> str:
 
             # 2. エンティティ/キーワードフィルタリング (送信元・送信先・関係性のいずれかに含まれるか)
             if target_entity:
-                if (target_entity not in str(u)) and (target_entity not in str(v)) and (target_entity not in str(rel)):
+                if (
+                    (target_entity not in str(u))
+                    and (target_entity not in str(v))
+                    and (target_entity not in str(rel))
+                ):
                     continue
 
             domain_info = f" [{edge_domain}]" if edge_domain else ""
@@ -278,8 +315,10 @@ async def get_graph_context(domain: str = "", entity: str = "") -> str:
 
         if not matched_triples:
             cond = []
-            if target_domain: cond.append(f"ドメイン: '{target_domain}'")
-            if target_entity: cond.append(f"キーワード: '{target_entity}'")
+            if target_domain:
+                cond.append(f"ドメイン: '{target_domain}'")
+            if target_entity:
+                cond.append(f"キーワード: '{target_entity}'")
             cond_str = ", ".join(cond) if cond else "指定条件"
             return f"該当する関係性データ（コンテキスト）が見つかりませんでした ({cond_str})。"
 
@@ -290,5 +329,7 @@ async def get_graph_context(domain: str = "", entity: str = "") -> str:
     except Exception as e:
         return f"エラー: コンテキスト抽出中に例外が発生しました: {str(e)}"
 
+
 if __name__ == "__main__":
+    start_local_web_server()
     mcp.run(transport="sse", host="0.0.0.0", port=5001)

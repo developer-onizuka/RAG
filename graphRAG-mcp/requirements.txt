@@ -1,5 +1,6 @@
 fastmcp
 langchain
+langchain-core
 langchain-experimental
 langchain-openai
 langchain-text-splitters
@@ -7,3 +8,5 @@ networkx
 pandas
 pyarrow
 pyvis
+uvicorn
+python-dotenv
