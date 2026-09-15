@@ -239,7 +239,7 @@ ClaudeDesktopからGraphRAGを操作するために、claude_desktop_config.json
 ```
 これをもとに作成されたナレッジグラフは以下です。
 
-<img src="https://github.com/developer-onizuka/RAG/blob/main/knowledge-graph2.png" width="720"><br>
+<img src="https://github.com/developer-onizuka/RAG/blob/main/knowledge-graph2.png" width="480"><br>
 
 #### 架空のストーリーをもとにした推論結果
 架空のストーリーに忠実な結果がでています。
