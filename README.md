@@ -295,8 +295,6 @@ SessionCache（Redis）が1台構成のままで、マルチAZクラスタ化の
 **セキュリティ監査指摘事項関連**
 - 本番DBへのアクセス経路をBastion経由＋VPC Peeringに厳格化し、開発VPCからの直接アクセスを遮断
 
----
-
 サービス依存関係（UserPortal→AuthService/OrderService、OrderService→PaymentService、PaymentService→AuthService、NotificationService←OrderServiceイベント）を見ると、**AuthServiceとPaymentServiceが障害連鎖の起点になりやすい構造**であることも分かります。特にAuthServiceは複数サービスから直接叩かれているため、SPOF解消とサーキットブレーカー導入が優先度高めと言えそうです。
 
 
