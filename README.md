@@ -397,7 +397,9 @@ GraphRAG結合: Inc-202601 --AFFECTED_BY--> Iamロール --AFFECTED_BY--> Resour
 単純な事実抽出や個別対策のリストアップであればVectorDBのみでも実用レベルですが、本件のように「システム間の複雑な相互作用」や「隠れたボトルネックの特定」が求められるシチュエーションでは、関係性を構造として保持するGraphRAGの優位性が明確に出ています。
 
 
-### 付録. ドラゴンボールのストーリーのグラフナレッジ化
+<br><br><br><br><br><br>
+
+# 付録. ドラゴンボールのストーリーのグラフナレッジ化
 
 #### register_document_and_index
 <img src="https://github.com/developer-onizuka/RAG/blob/main/register_document_and_index.png" width="720"><br>
