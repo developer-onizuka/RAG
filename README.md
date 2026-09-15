@@ -359,14 +359,14 @@ ClaudeDesktopにて、以下のプロンプトを実行します。
 グラフの `権限 --CONNECTION--> Spof --CONNECTION--> インフラチーム` という接続、および `Sessioncache --CAUSED_BY--> マルチAz --IMPLIES--> クラスタ化` という関係が示す通り、SessionCacheが1台構成のままクラスタ化が放置されている点がIAM問題と並んで「インフラチーム早急対応事項」として括られています。
 
 ## 過去の障害を踏まえた改善策
-
+```
 | インシデント | 根本原因（グラフ上の因果） | 改善策 |
 |---|---|---|
 | INC-202510（AuthService全系停止） | `Inc-202510 --CAUSED_BY--> Oom Kill`／`Authservice --NEEDS--> サーキットブレーカー` | SessionCacheのマルチAZクラスタ化、一時キャッシュとセッションデータの分離、AuthService障害時の後続サービス巻き添え防止のためサーキットブレーカー導入 |
 | INC-202405（PaymentService詰まり） | `Db --CONTAINS--> インデックス --CONTAINS--> インデックス見直し／定期的なスロークエリモニタリング／チューニング` | DBインデックス見直し、定期的なスロークエリモニタリング、コネクションプールのチューニング |
 | INC-202601（メール送信全滅） | `Inc-202601 --CAUSED_BY--> 過剰権限／上書き操作` | ワイルドカード権限の全廃、最小権限の原則（PoLP）徹底、IAMロールの定期監査タスク新設 |
 | セキュリティ監査指摘 | `開発Vpc --CONNECTION--> Proddb`（直接経路残存） | Bastion経由＋VPC Peeringによる厳格なアクセス経路分離 |
-
+```
 ## サービス依存構造からの示唆
 グラフの `Userportal --CALLS--> Authservice/Orderservice`、`Orderservice --CALLS--> Paymentservice/Notificationservice` という呼び出し関係から、**AuthServiceとOrderServiceがハブとなって障害を連鎖させやすい構造**であることが分かります。実際、PaymentServiceの詰まりがOrderService経由でNotificationServiceまで波及した（INC-202405）ように、この依存構造を放置するとSPOF解消をしてもボトルネックが移動するだけになりかねません。**サーキットブレーカーの導入はAuthServiceだけでなくOrderService⇄PaymentService間にも広げる**ことが望ましいと考えられます。
 ```
