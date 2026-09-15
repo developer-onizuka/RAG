@@ -262,7 +262,7 @@ ClaudeDesktopにて、以下のプロンプトを実行します。
 ```
 
 ### 5-1-4. 出力結果
-```
+
 検索結果と登録済みメモの内容を踏まえて、セキュリティ上の懸念点と改善策を整理します。
 
 ## セキュリティ上の懸念点
@@ -298,7 +298,7 @@ SessionCache（Redis）が1台構成のままで、マルチAZクラスタ化の
 ---
 
 サービス依存関係（UserPortal→AuthService/OrderService、OrderService→PaymentService、PaymentService→AuthService、NotificationService←OrderServiceイベント）を見ると、**AuthServiceとPaymentServiceが障害連鎖の起点になりやすい構造**であることも分かります。特にAuthServiceは複数サービスから直接叩かれているため、SPOF解消とサーキットブレーカー導入が優先度高めと言えそうです。
-```
+
 
 ### 5-2. GraphRAG環境の展開
 ```
@@ -344,7 +344,7 @@ ClaudeDesktopにて、以下のプロンプトを実行します。
 ```
 
 ### 5-2-4. 出力結果
-```
+
 ナレッジグラフ（構造的な関係性）とVectorDB（意味的な検索）の両方を突き合わせた結果を整理します。
 
 ## セキュリティ上の懸念点
@@ -359,17 +359,17 @@ ClaudeDesktopにて、以下のプロンプトを実行します。
 グラフの `権限 --CONNECTION--> Spof --CONNECTION--> インフラチーム` という接続、および `Sessioncache --CAUSED_BY--> マルチAz --IMPLIES--> クラスタ化` という関係が示す通り、SessionCacheが1台構成のままクラスタ化が放置されている点がIAM問題と並んで「インフラチーム早急対応事項」として括られています。
 
 ## 過去の障害を踏まえた改善策
-```
+
 | インシデント | 根本原因（グラフ上の因果） | 改善策 |
 |---|---|---|
 | INC-202510（AuthService全系停止） | `Inc-202510 --CAUSED_BY--> Oom Kill`／`Authservice --NEEDS--> サーキットブレーカー` | SessionCacheのマルチAZクラスタ化、一時キャッシュとセッションデータの分離、AuthService障害時の後続サービス巻き添え防止のためサーキットブレーカー導入 |
 | INC-202405（PaymentService詰まり） | `Db --CONTAINS--> インデックス --CONTAINS--> インデックス見直し／定期的なスロークエリモニタリング／チューニング` | DBインデックス見直し、定期的なスロークエリモニタリング、コネクションプールのチューニング |
 | INC-202601（メール送信全滅） | `Inc-202601 --CAUSED_BY--> 過剰権限／上書き操作` | ワイルドカード権限の全廃、最小権限の原則（PoLP）徹底、IAMロールの定期監査タスク新設 |
 | セキュリティ監査指摘 | `開発Vpc --CONNECTION--> Proddb`（直接経路残存） | Bastion経由＋VPC Peeringによる厳格なアクセス経路分離 |
-```
+
 ## サービス依存構造からの示唆
 グラフの `Userportal --CALLS--> Authservice/Orderservice`、`Orderservice --CALLS--> Paymentservice/Notificationservice` という呼び出し関係から、**AuthServiceとOrderServiceがハブとなって障害を連鎖させやすい構造**であることが分かります。実際、PaymentServiceの詰まりがOrderService経由でNotificationServiceまで波及した（INC-202405）ように、この依存構造を放置するとSPOF解消をしてもボトルネックが移動するだけになりかねません。**サーキットブレーカーの導入はAuthServiceだけでなくOrderService⇄PaymentService間にも広げる**ことが望ましいと考えられます。
-```
+
 
 # 6. 結果の比較
 VectorDB単体でも過去障害の事実や個別対策を網羅できていますが、GraphRAG（＋VectorDB）を突き合わせた結果は「多段依存の追跡」と「システム全体の構造的インサイトの導出」において決定的な差が現れています。
@@ -378,21 +378,33 @@ VectorDB単体でも過去障害の事実や個別対策を網羅できていま
 
 ### 6-1. 多段依存関係の連結・追跡能力
 
-VectorDB単体: チャンク内に書かれた「UserPortal→AuthService」や「PaymentService→AuthService」といった局所的な関係性を文字列として拾い出し、要約しています。
+VectorDB単体: 
 
-GraphRAG結合: Userportal --CALLS--> Authservice/Orderservice から Orderservice --CALLS--> Paymentservice/Notificationservice という複数チャンクに跨るノード・エッジを連結し、障害が末端の NotificationService まで波及する長鎖の連鎖経路を構造的に再現しています。
+チャンク内に書かれた「UserPortal→AuthService」や「PaymentService→AuthService」といった局所的な関係性を文字列として拾い出し、要約しています。
+
+GraphRAG結合: 
+
+Userportal --CALLS--> Authservice/Orderservice から Orderservice --CALLS--> Paymentservice/Notificationservice という複数チャンクに跨るノード・エッジを連結し、障害が末端の NotificationService まで波及する長鎖の連鎖経路を構造的に再現しています。
 
 ### 6-2. 構造的インサイト（提案の質）の深さ
 
-VectorDB単体: ドキュメントに記載された各障害の改善策（Redisクラスタ化、IAMワイルドカード廃止など）を素直に箇条書きで並べるにとどまります。
+VectorDB単体: 
 
-GraphRAG結合: グラフの呼び出し構造全体を俯瞰し、「AuthServiceのSPOFを解消しても、依存構造上ボトルネックが OrderService ↔ PaymentService に移動するだけになる」という、テキストに直接書かれていない大域的なリスクと改善提案（サーキットブレーカー適用範囲の拡大） を自発的に導出できています。
+ドキュメントに記載された各障害の改善策（Redisクラスタ化、IAMワイルドカード廃止など）を素直に箇条書きで並べるにとどまります。
+
+GraphRAG結合: 
+
+グラフの呼び出し構造全体を俯瞰し、「AuthServiceのSPOFを解消しても、依存構造上ボトルネックが OrderService ↔ PaymentService に移動するだけになる」という、テキストに直接書かれていない大域的なリスクと改善提案（サーキットブレーカー適用範囲の拡大） を自発的に導出できています。
 
 ### 6-3. 因果関係の説明性（Explainability）
 
-VectorDB単体: 類似テキストをまとめた文章回答となるため、なぜその改善策が必要なのかの根拠が文章に依存します。
+VectorDB単体: 
 
-GraphRAG結合: Inc-202601 --AFFECTED_BY--> Iamロール --AFFECTED_BY--> Resource: "*" のように、事象・リソース・原因のグラフパスが提示されるため、判定根拠が極めて明確かつ追尾可能です。
+類似テキストをまとめた文章回答となるため、なぜその改善策が必要なのかの根拠が文章に依存します。
+
+GraphRAG結合: 
+
+Inc-202601 --AFFECTED_BY--> Iamロール --AFFECTED_BY--> Resource: "*" のように、事象・リソース・原因のグラフパスが提示されるため、判定根拠が極めて明確かつ追尾可能です。
 
 単純な事実抽出や個別対策のリストアップであればVectorDBのみでも実用レベルですが、本件のように「システム間の複雑な相互作用」や「隠れたボトルネックの特定」が求められるシチュエーションでは、関係性を構造として保持するGraphRAGの優位性が明確に出ています。
 
