@@ -177,14 +177,16 @@ async def generate_visualization_html() -> str:
 
 @mcp.tool()
 async def query_knowledge_graph(domain: str = None, prompt: str = "") -> str:
-    """任意のプロンプトを受け取り、ナレッジグラフの文脈を元に回答を生成します。
+    """【デバッグ・開発者専用 / LLM使用禁止】
+    このツールはMCPサーバー内部の検証用です。LLMクライアント（Claude等）はユーザーへの回答作成にこのツールを使用してはいけません。
+    関係性データの取得には必ず 'get_graph_context' ツールを使用してください。
 
     Args:
-        domain: 検索対象を特定のドメインに絞り込む場合に指定。省略時は全ドメイン対象。
-        prompt: 質問や指示テキスト
-    """
+        domain: 検索対象のドメイン。省略時は全ドメイン。
+        prompt: 開発検証用のプロンプト
     if not os.path.exists(GRAPH_FILE):
         return f"エラー: ナレッジグラフファイル '{GRAPH_FILE}' が見つかりません。"
+    """
 
     try:
         G = nx.read_graphml(GRAPH_FILE)
@@ -235,6 +237,58 @@ async def query_knowledge_graph(domain: str = None, prompt: str = "") -> str:
 
     except Exception as e:
         return f"エラー: 質問処理中に例外が発生しました: {str(e)}"
+
+@mcp.tool()
+async def get_graph_context(domain: str = "", entity: str = "") -> str:
+    """Claude DesktopなどのLLMクライアント向けに、ナレッジグラフから関連する関係性（コンテキスト）を抽出してテキストで返します。
+
+    Args:
+        domain: 検索対象のドメイン（例: "dragonball"）。空文字または "all" で全体。
+        entity: 絞り込みたいエンティティ名やキーワード（例: "悟空"）。空文字で全関係性を出力。
+    """
+    if not os.path.exists(GRAPH_FILE):
+        return f"エラー: ナレッジグラフファイル '{GRAPH_FILE}' が見つかりません。"
+
+    try:
+        G = nx.read_graphml(GRAPH_FILE)
+        if G.number_of_nodes() == 0:
+            return "エラー: ナレッジグラフにノードが存在しません。"
+
+        target_domain = None if domain.strip().lower() in ["", "all", "none", "*"] else domain.strip()
+        target_entity = entity.strip()
+
+        matched_triples = []
+
+        for u, v, data in G.edges(data=True):
+            edge_domain = data.get("domain", "")
+
+            # 1. ドメインフィルタリング
+            if target_domain and edge_domain != target_domain:
+                continue
+
+            rel = data.get("relation", "関連")
+
+            # 2. エンティティ/キーワードフィルタリング (送信元・送信先・関係性のいずれかに含まれるか)
+            if target_entity:
+                if (target_entity not in str(u)) and (target_entity not in str(v)) and (target_entity not in str(rel)):
+                    continue
+
+            domain_info = f" [{edge_domain}]" if edge_domain else ""
+            matched_triples.append(f"・{u} --({rel})--> {v}{domain_info}")
+
+        if not matched_triples:
+            cond = []
+            if target_domain: cond.append(f"ドメイン: '{target_domain}'")
+            if target_entity: cond.append(f"キーワード: '{target_entity}'")
+            cond_str = ", ".join(cond) if cond else "指定条件"
+            return f"該当する関係性データ（コンテキスト）が見つかりませんでした ({cond_str})。"
+
+        # 抽出結果をテキスト構造化して返す（これをClaude Desktopが読んで回答を生成する）
+        header = f"【ナレッジグラフ抽出コンテキスト (該当件数: {len(matched_triples)}件)】\n"
+        return header + "\n".join(matched_triples[:300])
+
+    except Exception as e:
+        return f"エラー: コンテキスト抽出中に例外が発生しました: {str(e)}"
 
 if __name__ == "__main__":
     mcp.run(transport="sse", host="0.0.0.0", port=5001)

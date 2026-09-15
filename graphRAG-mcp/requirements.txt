@@ -1,0 +1,9 @@
+fastmcp
+langchain
+langchain-experimental
+langchain-openai
+langchain-text-splitters
+networkx
+pandas
+pyarrow
+pyvis
