@@ -376,31 +376,31 @@ VectorDB単体でも過去障害の事実や個別対策を網羅できていま
 
 ### 6-1. 多段依存関係の連結・追跡能力
 
-VectorDB単体: 
+- VectorDB単体: 
 
 チャンク内に書かれた「UserPortal→AuthService」や「PaymentService→AuthService」といった局所的な関係性を文字列として拾い出し、要約しています。
 
-GraphRAG結合: 
+- GraphRAG結合: 
 
 Userportal --CALLS--> Authservice/Orderservice から Orderservice --CALLS--> Paymentservice/Notificationservice という複数チャンクに跨るノード・エッジを連結し、障害が末端の NotificationService まで波及する長鎖の連鎖経路を構造的に再現しています。
 
 ### 6-2. 構造的インサイト（提案の質）の深さ
 
-VectorDB単体: 
+- VectorDB単体: 
 
 ドキュメントに記載された各障害の改善策（Redisクラスタ化、IAMワイルドカード廃止など）を素直に箇条書きで並べるにとどまります。
 
-GraphRAG結合: 
+- GraphRAG結合: 
 
 グラフの呼び出し構造全体を俯瞰し、「AuthServiceのSPOFを解消しても、依存構造上ボトルネックが OrderService ↔ PaymentService に移動するだけになる」という、テキストに直接書かれていない大域的なリスクと改善提案（サーキットブレーカー適用範囲の拡大） を自発的に導出できています。
 
 ### 6-3. 因果関係の説明性（Explainability）
 
-VectorDB単体: 
+- VectorDB単体: 
 
 類似テキストをまとめた文章回答となるため、なぜその改善策が必要なのかの根拠が文章に依存します。
 
-GraphRAG結合: 
+- GraphRAG結合: 
 
 Inc-202601 --AFFECTED_BY--> Iamロール --AFFECTED_BY--> Resource: "*" のように、事象・リソース・原因のグラフパスが提示されるため、判定根拠が極めて明確かつ追尾可能です。
 
