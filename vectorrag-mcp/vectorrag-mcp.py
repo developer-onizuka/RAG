@@ -1,3 +1,4 @@
+import re
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from fastmcp import FastMCP
@@ -27,6 +28,10 @@ class SimpleVectorDB:
         top_indices = np.argsort(scores)[::-1][:top_k]
         return [(float(scores[i]), self.metadata[i]) for i in top_indices]
 
+    def clear(self):
+        self.vectors = []
+        self.metadata = []
+
 # 多言語対応の軽量埋め込みモデル
 model = SentenceTransformer("intfloat/multilingual-e5-small")
 
@@ -35,12 +40,40 @@ mcp = FastMCP("SimpleVectorDB")
 db = SimpleVectorDB()
 
 @mcp.tool()
-def add_document(text: str, category: str = "general") -> str:
-    """テキストをベクトル化してVectorDBに登録します。"""
-    embedding = model.encode(f"passage: {text}").tolist()
-    metadata = {"text": text, "category": category}
-    db.add(embedding, metadata)
-    return f"登録完了 (現在の総データ数: {len(db.vectors)} 件)"
+def add_document(
+    text: str, 
+    category: str = "general", 
+    chunk_size: int = 200, 
+    overlap: int = 50
+) -> str:
+    """テキストを固定文字数（デフォルト200文字、重複50文字）で分割してVectorDBに登録します。"""
+    # 改行コードの正規化と不要なエスケープの除去
+    normalized_text = text.replace('\\n', '\n').replace('\r\n', '\n').strip()
+
+    chunks = []
+    start = 0
+    text_length = len(normalized_text)
+
+    while start < text_length:
+        end = start + chunk_size
+        chunk = normalized_text[start:end].strip()
+        
+        if len(chunk) > 10:  # 極端に短い末端データは除外
+            chunks.append(chunk)
+            
+        # 次のチャンクの開始位置（オーバーラップ分だけ戻す）
+        start += (chunk_size - overlap)
+        if chunk_size <= overlap: # 無限ループ防止
+            break
+
+    added_count = 0
+    for chunk in chunks:
+        embedding = model.encode(f"passage: {chunk}").tolist()
+        metadata = {"text": chunk, "category": category}
+        db.add(embedding, metadata)
+        added_count += 1
+
+    return f"登録完了: {added_count} 個のチャンク（サイズ:{chunk_size}/重複:{overlap}）に分割登録しました。(現在の総データ数: {len(db.vectors)} 件)"
 
 @mcp.tool()
 def search_similar(query: str, top_k: int = 3) -> str:
@@ -60,6 +93,12 @@ def search_similar(query: str, top_k: int = 3) -> str:
         )
 
     return "\n\n".join(output)
+
+@mcp.tool()
+def reset_db() -> str:
+    """VectorDBに登録されているすべてのデータを消去します。"""
+    db.clear()
+    return "データベースをリセットしました。"
 
 if __name__ == "__main__":
     # SSE (Server-Sent Events) モードで起動
