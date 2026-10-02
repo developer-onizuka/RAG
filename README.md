@@ -180,7 +180,7 @@ https://cdn.openai.com/pdf/37dce0c6-b190-4cf6-b6b9-2651fe6af98a/%E3%82%A8%E3%83%
 
 # 5. RAGの比較実験
 
-以下の架空のドキュメントをもとに、VectorDBとグラフナレッジを作成します。
+以下の架空のドキュメントを、まずはVectorDBとして登録します。
 ```
 === インフラ・開発チーム雑記＆障害振り返りメモ（未整理） ===
 
@@ -280,9 +280,46 @@ ClaudeDesktopからGraphRAGを操作するために、claude_desktop_config.json
 
 ### 5-2-2. GraphRAGによるグラフナレッジ化
 ClaudeDesktopにて、以下のプロンプトを実行します。
+次に、以下は既知の情報(知る人ぞ知る情報)をGraphRAGとして登録しておきます。以下をClaudeDesktopからGraphRAGとしてグラフナレッジ化します。
+
 ```
-次に以下の文章をGraphRAGにナレッジグラフとして登録してください。
-<先述の架空のドキュメントの内容をペースト>
+以下はサービス仕様です。これをGraphRAGとしてグラフナレッジ化してください。
+
+1. サービス・コンポーネントの依存関係と役割
+UserPortal (UserPortal)
+役割: ユーザー向けポータル画面およびフロントエンド処理。
+依存関係: 認証機能を提供する AuthService および注文処理を行う OrderService に依存しています。
+
+AuthService (AuthService)
+役割: 認証およびセッション管理を統括する中核サービス。
+属性: クリティカルコンポーネント（isCritical: true）。
+依存関係: セッション情報の保持・検証のために SessionCache に依存しています。
+
+SessionCache (SessionCache (Redis))
+役割: 認証セッションを高速に保持するためのインメモリキャッシュ（Redis）。
+属性: 単一障害点（isSinglePointOfFailure: true）、クラスタ構成は単一ノード（SingleNode）、マルチAZ未対応（multiAZ: false）、インフラリスク評価は「高（High）」。
+
+OrderService (OrderService)
+役割: 受注処理および注文管理。
+依存関係: 決済処理を行う PaymentService に依存しています。
+
+PaymentService (PaymentService)
+役割: 決済実行およびトークンの有効性チェック。
+依存関係: トークン検証などのため、認証系サービスである AuthService に直接依存しています。
+
+NotificationService (NotificationService)
+役割: 非同期のメール通知などを担当するディスパッチャー。
+依存関係: OrderService からのイベントフックを受けて動作する仕組みになっています。
+
+2. インフラ・セキュリティ要件の定義
+本番データベース (ProdDB)
+環境: 本番環境（Production）。
+開発用ネットワーク環境 (DevVPC)
+
+属性: 本番データベース（ProdDB）への直接アクセス経路が許可されている非準拠状態（securityComplianceStatus: Non-Compliant, directAccessTo: ProdDB）。本来のあるべきアーキテクチャとしては「踏み台（Bastion）＋ VPC Peering」による厳格な分離が必須とされています。
+
+サービス用IAMロール (Service IAM Role)
+属性: ワイルドカード権限（*）を保有しており（hasWildcardPermission: true）、最小権限の原則が適用されていない状態（principleOfLeastPrivilegeApplied: false）。セキュリティリスクレベルは「高（High）」と定義されています。
 ```
 
 これをもとに作成されたナレッジグラフは以下です。
