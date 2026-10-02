@@ -311,12 +311,12 @@ ClaudeDesktopからGraphRAGを操作するために、claude_desktop_config.json
     },
 ```
 
-### 5-2-2. GraphRAGによるグラフナレッジ化
+### 5-2-2. GraphRAGによるナレッジグラフ化
 ClaudeDesktopにて、以下のプロンプトを実行します。
-次に、以下は既知の情報(知る人ぞ知る情報)をGraphRAGとして登録しておきます。以下をClaudeDesktopからGraphRAGとしてグラフナレッジ化します。
+次に、以下は既知の情報(知る人ぞ知る情報)をGraphRAGとして登録しておきます。以下をClaudeDesktopからGraphRAGとしてナレッジグラフ化します。
 
 ```
-以下はサービス仕様です。これをGraphRAGとしてグラフナレッジ化してください。
+以下はサービス仕様です。これをGraphRAGとしてナレッジグラフ化してください。
 
 1. サービス・コンポーネントの依存関係と役割
 (1) UserPortal (UserPortal)
@@ -363,15 +363,12 @@ ClaudeDesktopにて、以下のプロンプトを実行します。
 以下のプロンプトを実行します。
 ```
 当社におけるセキュリティ上の懸念点や、過去の障害を踏まえた改善策を教えてください。
-今回はグラフナレッジとVectorDBの検索の両方を駆使してください。
+今回はナレッジグラフとVectorDBの検索の両方を駆使してください。
 ```
 
 ### 5-2-4. 出力結果
 
-ナレッジグラフ（構造的な関係性）とVectorDB（意味的な検索）の両方を突き合わせた結果を整理します。
-
-
-グラフナレッジ（構造・影響範囲）とVectorDB（障害の原因・対策）を突き合わせて整理しました。
+ナレッジグラフ（構造・影響範囲）とVectorDB（障害の原因・対策）を突き合わせて整理しました。
 
 #### 懸念点
 
@@ -430,7 +427,7 @@ VectorDB単体でも過去障害の事実や個別対策を網羅できていま
 
 <br><br><br><br><br><br>
 
-# 付録. ドラゴンボールのストーリーのグラフナレッジ化
+# 付録. ドラゴンボールのストーリーのナレッジグラフ化
 
 #### register_document_and_index
 <img src="https://github.com/developer-onizuka/RAG/blob/main/register_document_and_index.png" width="720"><br>
