@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vectorrag-mcp
+  labels:
+    app: vectorrag-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vectorrag-mcp
+  template:
+    metadata:
+      labels:
+        app: vectorrag-mcp
+    spec:
+      containers:
+      - name: vectorrag-mcp
+        image: developeronizuka/vectorrag-mcp:1.0.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5001
+          name: sse-port
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-vectorrag-mcp
+spec:
+  type: LoadBalancer
+  selector:
+    app: vectorrag-mcp
+  ports:
+  - port: 5001
+    targetPort: 5001
+    name: sse-port
