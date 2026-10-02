@@ -16,8 +16,8 @@ spec:
     spec:
       containers:
       - name: mcp-app
-        image: developeronizuka/graphrag-mcp:1.0.0
-        imagePullPolicy: IfNotPresent
+        image: developeronizuka/graphrag-mcp:1.0.1
+        #imagePullPolicy: Always
         ports:
         - containerPort: 5001
           name: mcp-port
