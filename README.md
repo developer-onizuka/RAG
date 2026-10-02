@@ -361,7 +361,7 @@ ClaudeDesktopにて、以下のプロンプトを実行します。
 
 これをもとに作成されたナレッジグラフは以下です。
 
-<img src="https://github.com/developer-onizuka/RAG/blob/main/knowledge-graph2.png" width="720"><br>
+<img src="https://github.com/developer-onizuka/RAG/blob/main/knowledge-graph2.png" width="960"><br>
 
 ### 5-2-3. GraphRAGの結果
 以下のプロンプトを実行します。
