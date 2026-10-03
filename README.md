@@ -180,7 +180,8 @@ https://cdn.openai.com/pdf/37dce0c6-b190-4cf6-b6b9-2651fe6af98a/%E3%82%A8%E3%83%
 
 # 5. RAGの比較検証実験
 
-https://www.youtube.com/watch?v=nhhEXCXQsJQ
+今回の比較検証の動画はこちらをご覧ください。<br>
+- https://www.youtube.com/watch?v=nhhEXCXQsJQ
 
 
 以下の架空のドキュメントを、まずはVectorDBとして登録します。
